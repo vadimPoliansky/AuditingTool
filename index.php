@@ -6,6 +6,11 @@
 	.changed {
 		font-size:1.1em;
 	}
+	
+	.changed-row {
+		background: none repeat scroll 0 0 #824d4d !important;
+		color: #e4e4e4;
+	}
 
 	.changed-pre {
 		background: none repeat scroll 0 0 #ff6363 !important;
@@ -47,29 +52,32 @@
 					
 					changes = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changes');
 					for (var i=1, len=changes; i<=len; i++){
+						$(td).addClass('changed-row');
 						var field = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Field' + i)
 						if (field == prop){
-							var oldValue = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Old_Value' + i)
-							var newValue = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_New_Value' + i)
-							var user = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Reviewer_Name' + i)
-							var date = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Date_Of_Change' + i)
 							var changedID = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_ID' + i)
-							$(td).addClass('changed');
-							$(td).addClass('changed-pre');
-							$(td).tooltipster();
-							var tooltipContent = $(td).tooltipster('content');
-							if (tooltipContent == null) { 
-								tooltipContent = ''; 
-							}
-							var currChange = "<div>" + user + " changed " + field + " on " + date + " from " + oldValue + " to " + newValue  + "</div>";
-							$(tooltipContent).append(currChange);
-							$(td).tooltipster('content', $(tooltipContent));
-							if ($dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr != null){
-								$dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr.push(changedID);
-							} else {
-								$dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr = [];
-							}
-							console.log($dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr);
+//							if ($.inArray(changedID, $dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr) != -1){
+								var oldValue = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Old_Value' + i)
+								var newValue = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_New_Value' + i)
+								var user = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Reviewer_Name' + i)
+								var date = $dataTableEdit.handsontable('getDataAtRowProp',row,'Changed_Date_Of_Change' + i)
+								$(td).addClass('changed');
+								$(td).addClass('changed-pre');
+								$(td).tooltipster();
+								var tooltipContent = $(td).tooltipster('content');
+								if (tooltipContent == null) { 
+									tooltipContent = $('<div></div>'); 
+								}
+								//var currChange = "<div>" + user + " changed " + field + " on " + date + " from " + oldValue + " to " + newValue  + "</div>";
+								var currChange = "<div>" + date + "| " + user + ": " + oldValue + " -> " + newValue + "</div>";
+								$(tooltipContent).append(currChange);
+								$(td).tooltipster('content', $(tooltipContent));
+								if ($dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr != null){
+									$dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr.push(changedID);
+								} else {
+									$dataTableEdit.handsontable("getCellMeta",row,col).changedIDArr = [changedID];
+								}
+//							}
 						}
 					}
 					
@@ -87,8 +95,6 @@
 					strechW: 'auto',
 					scrollH: 'auto',
 					scrollV: 'auto',
-					width:500,
-					height:700,
 					columns: [
 						{data: 'EncounterNumber', name:'EncounterNumber', renderer:"highlightRenderer"},
 						{data: 'ChartNumber', renderer:"highlightRenderer"},
