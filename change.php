@@ -1,6 +1,6 @@
 <?php
 
-$dbh = new PDO("odbc:Driver={Microsoft Access Driver (*.mdb, *.accdb)};Dbq=C:\\xampp\\htdocs\\AuditTest\\audit_be.accdb;Uid=Admin");
+$dbh = new PDO("odbc:Driver={Microsoft Access Driver (*.mdb, *.accdb)};Dbq=S:\\OQPM\\OQPM Team\\Vadim\\AuditToolTest\\audit_be.accdb;Uid=Admin");
 
 $parameters = $_POST['parameters'];
 
