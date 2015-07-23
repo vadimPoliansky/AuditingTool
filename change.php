@@ -2,7 +2,9 @@
 
 $dbh = new PDO("odbc:Driver={Microsoft Access Driver (*.mdb, *.accdb)};Dbq=S:\\OQPM\\OQPM Team\\Vadim\\AuditToolTest\\audit_be.accdb;Uid=Admin");
 
-$parameters = $_POST['parameters'];
+//$parameters = $_POST['Reviewer_Name'];
+//$json_request = (json_decode($request) != NULL) ? true : false;
+print_r($_POST);
 
 $dbh->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
 

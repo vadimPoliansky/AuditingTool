@@ -148,6 +148,8 @@
 		var colHeadersOrg = [
             "EncounterNumber",
             "Chart Number",
+			"Entry Code",
+			"Admit Category",
 			"Age Number",
             "AgeCode",
             "Age Category",
@@ -163,6 +165,12 @@
 			"HIG Desc",
 			"HIG Weight",
 			"HIG LS Trim",
+			"Institution From",
+			"Institution From Desc",
+			"Inst From Hosp Type",
+			"Institution To",
+			"Institution To Desc",
+			"Inst To Hosp Type",
 			"Team",
 			"Team Desc",
 			"LOS",
@@ -271,7 +279,7 @@
 					}
 				};
 				Handsontable.renderers.registerRenderer('highlightRenderer', highlightRenderer);
-				var colWidthsOrg = [100, 100, 50, 50, 150,100,100,100,200,100,500,100,500,100,500,100,100,100,300,100,100,100,100,100,100,100,100,100,00,100,100,500,200,200,110,110,110,110,150,200,100];
+				var colWidthsOrg = [100, 100, 50, 50, 50, 50, 150,100,100,100,200,100,500,100,500,100,500,100,100,100,150,150,150,150,150,150,300,100,100,100,100,100,100,100,100,100,00,100,100,500,200,200,110,110,110,110,150,200,100];
 				
 				var $dataTableEdit = $('#dataTableEdit');
 				$dataTableEdit.handsontable({
@@ -287,6 +295,8 @@
 					columns: [
 						{data: 'EncounterNumber', name:'EncounterNumber', renderer:"highlightRenderer"},
 						{data: 'ChartNumber', renderer:"highlightRenderer"},
+						{data: 'EntryCode', renderer:"highlightRenderer"},
+						{data: 'AdmitCategory', renderer:"highlightRenderer"},
 						{data: 'AgeNumber', renderer:"highlightRenderer"},
 						{data: 'AgeCode', renderer:"highlightRenderer"},
 						{data: 'CMGAgeCategoryDesc', renderer:"highlightRenderer"},
@@ -302,6 +312,12 @@
 						{data: 'HIG_Description', renderer:"highlightRenderer"},
 						{data: 'HIG_Weight', renderer:"highlightRenderer"},
 						{data: 'HIG_LongStayTrimDays', renderer:"highlightRenderer"},
+						{data: 'InstitutionFrom', renderer:"highlightRenderer"},
+						{data: 'InstitutionFromDesc', renderer:"highlightRenderer"},
+						{data: 'InstFromHospType', renderer:"highlightRenderer"},
+						{data: 'InstitutionTo', renderer:"highlightRenderer"},
+						{data: 'InstitutionToDesc', renderer:"highlightRenderer"},
+						{data: 'InstToHospType', renderer:"highlightRenderer"},
 						{data: 'BasicOption19', renderer:"highlightRenderer"},
 						{data: 'BasicOption19Desc', renderer:"highlightRenderer"},
 						{data: 'LOSDays', renderer:"highlightRenderer"},
