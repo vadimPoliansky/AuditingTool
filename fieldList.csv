@@ -11,6 +11,10 @@ DischNursingAreaUnitLocation
 AttendingPhysicianDesc
 Diagnosis_Code
 Diagnosis_Description
+Diagnosis_Type
+Diagnosis_Type_Desc
+InterventionAssignment
+InterventionAssignmentDesc
 CMG
 CMG_Description
 HIG_Code
