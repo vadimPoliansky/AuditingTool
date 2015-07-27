@@ -153,6 +153,7 @@ try {
 //			from diagView WHERE EncounterNumber = '" . $row['EncounterNumber'] . "'
 //			AND DiagnosisCIHIValue != '" . $row['Diagnosis_Code'] . "'
 //			"; 
+		if(true){	//Diagnosis
 		$queryDiag = "select *,
 			CONVERT(VARCHAR(10), AdmissionDate, 111) as AdmissionDateFormated,
 			CONVERT(VARCHAR(10), DischargeDate, 111) as DischargeDateFormated
@@ -437,40 +438,277 @@ try {
 			array_push($addRowArr , $rowDiagNewDeleted);
 			
 		}
+		}
 		
-		//$queryInt = "select *,
-		//	CONVERT(VARCHAR(10), AdmissionDate, 111) as AdmissionDateFormated,
-		//	CONVERT(VARCHAR(10), DischargeDate, 111) as DischargeDateFormated
-		//	from intervensionView WHERE EncounterNumber = '" . $row['EncounterNumber'] . "'
-		//	AND IntervCIHIValue != '" . $row['InterventionAssignment'] . "'
-		//	"; 
+		if(true){	//Interventions
 		$queryInt = "select *,
 			CONVERT(VARCHAR(10), AdmissionDate, 111) as AdmissionDateFormated,
 			CONVERT(VARCHAR(10), DischargeDate, 111) as DischargeDateFormated
 			from I10_Abstract_And_Intervention_VR WHERE EncounterNumber = '" . $row['EncounterNumber'] . "'
-			AND IntervCIHIValue != '" . $row['InterventionAssignment'] . "'
+			AND IntervCode != '" . $row['InterventionAssignment'] . "'
 			"; 
 		$stmtInt = $conn->prepare( $queryInt ); 
    
 		$stmtInt->execute();
    
+		$intString = "";
 		$addRowArrLen = count($addRowArr);
 		$addRowArrIndex = 0;
 		while ( $rowInt = $stmtInt->fetch( PDO::FETCH_ASSOC ) ){ 
 			$rowIntNew = array();
 			
 			$rowIntNew['EncounterNumber'] = $encounter_Number;
-			$rowIntNew['InterventionAssignment'] = $rowInt['IntervCIHIValue'];
+			$rowIntNew['InterventionAssignment'] = $rowInt['IntervCode'];
 			$rowIntNew['InterventionAssignmentDesc'] = $rowInt['IntervCodeDesc'];
+			$rowIntNew['InterventionAttributeStatus'] = $rowInt['IntervAttribStatus'];
+			$intString .= "'" . $rowIntNew['InterventionAssignment'] . "',"; 
+			
+			$sql_Changes = "SELECT * FROM Chart_Changes WHERE Encounter_Number = :Encounter_Number AND InterventionAssignment = :InterventionAssignment ORDER BY Date_Of_Change";
+			$sth_Changes = $dbh->prepare($sql_Changes);
+			$sth_Changes->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+			$sth_Changes->bindParam(':InterventionAssignment', $rowIntNew['InterventionAssignment'], PDO::PARAM_STR);
+			$sth_Changes->execute();
+			$changes = 0;
+			$rowIntNew['Changes'] = $changes;
+			while ($row_Changes = $sth_Changes->fetch()) {
+				$changes++;
+				$rowIntNew['Changes'] = (string) $changes;
+				$rowIntNew['Changed_ID' . $changes] = $row_Changes['ID'];
+				$rowIntNew['Changed_Field' . $changes] = $row_Changes['Field'];
+				$rowIntNew['Changed_Old_Value' . $changes] = $row_Changes['Old_Value'];
+				$rowIntNew['Changed_New_Value' . $changes] = $row_Changes['New_Value'];
+				$rowIntNew['Changed_Reviewer_Name' . $changes] = $row_Changes['Reviewer_Name'];
+				$rowIntNew['Changed_Date_Of_Change' . $changes] = $row_Changes['Date_Of_Change'];
+			}
+			
+			$sql_GetValue = "SELECT TOP 1 * FROM Chart_Intervensions WHERE Encounter_Number = :EncounterNumber AND InterventionAssignment = :InterventionAssignment ORDER BY Date_Of_Get DESC";
+			$sth_GetValue = $dbh->prepare($sql_GetValue);
+			$sth_GetValue->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
+			$sth_GetValue->bindParam(':InterventionAssignment', $rowIntNew['InterventionAssignment'], PDO::PARAM_STR);
+			$sth_GetValue->execute();
+			$intFound = false;
+			while ($row_Value = $sth_GetValue->fetch()) {
+				$intFound = true;
+			}
+			if ($intFound == false && $rowFound){
+				$currField = 'InterventionAssignment';
+				$changes++;
+				$rowIntNew['Changes'] = (string) $changes;
+				$rowIntNew['Changed_ID' . $changes] = 'Add';
+				$rowIntNew['Changed_Field' . $changes] = $currField;
+				$rowIntNew['Changed_Old_Value' . $changes] = 'N/A';
+				$rowIntNew['Changed_New_Value' . $changes] = $rowIntNew[$currField];
+				$rowIntNew['Changed_Reviewer_Name' . $changes] = "WINRECS";
+				$rowIntNew['Changed_Date_Of_Change' . $changes] = $date;
+				$rowIntNew['Changed_Type' . $changes] = "Add";
+				
+				$sqlChanged = 
+				"Insert Into Chart_Changes (
+						Encounter_Number,
+						Reviewer_Name,
+						Field,
+						Old_Value,
+						New_Value,
+						Date_Of_Change,
+						Type,
+						InterventionAssignment
+					) Values (
+						:Encounter_Number,
+						:Reviewer_Name,
+						:Field,
+						:Old_Value,
+						:New_Value,
+						:Date_Of_Change,
+						:Type,
+						:InterventionAssignment
+					)";
+
+				$sthChanged = $dbh->prepare($sqlChanged);
+				$sthChanged->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+				$sthChanged->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
+				$sthChanged->bindParam(':Field', $currField, PDO::PARAM_STR);
+				$sthChanged->bindParam(':Old_Value', $a = 'N/A', PDO::PARAM_STR);
+				$sthChanged->bindParam(':New_Value', $rowIntNew[$currField], PDO::PARAM_STR);
+				$sthChanged->bindParam(':Type', $a = 'Add', PDO::PARAM_STR);
+				$sthChanged->bindParam(':InterventionAssignment', $rowIntNew['InterventionAssignment'], PDO::PARAM_STR);
+				
+				$sthChanged->bindParam(':Date_Of_Change', $date , PDO::PARAM_INT);
+					
+				header('Content-type: application/json');
+				if (!$sthChanged) {
+					echo "\nPDO::errorInfo():\n";
+					print_r($dbh->errorInfo());
+					$response_array['status'] = 'error';  
+					header('Content-type: application/json');
+					echo json_encode();
+				}
+
+				$sthChanged->execute();
+			}
+
+			if ($addRowArrIndex>$addRowArrLen){
+				array_push($addRowArr , $rowIntNew);
+			}else{
+				$addRowArr[$addRowArrIndex]['EncounterNumber'] = $encounter_Number;
+				$addRowArr[$addRowArrIndex]['InterventionAssignment'] = $rowIntNew['InterventionAssignment'];
+				$addRowArr[$addRowArrIndex]['InterventionAssignmentDesc'] = $rowIntNew['InterventionAssignmentDesc'];
+				
+				$currChanges = isset($addRowArr[$addRowArrIndex]['Changes']) ? $addRowArr[$addRowArrIndex]['Changes'] : 0;
+				for($ci = 0; $ci < $changes; $ci++){
+					$currChanges++;
+					$currField = 'InterventionAssignment';
+					$addRowArr[$addRowArrIndex]['Changes'] = (string) $currChanges;
+					$addRowArr[$addRowArrIndex]['Changed_ID' . $currChanges] = $rowIntNew['Changed_ID' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Field' . $currChanges] = $rowIntNew['Changed_Field' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Old_Value' . $currChanges] = $rowIntNew['Changed_Old_Value' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_New_Value' . $currChanges] = $rowIntNew['Changed_New_Value' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Reviewer_Name' . $currChanges] = $rowIntNew['Changed_Reviewer_Name' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Date_Of_Change' . $currChanges] = $rowIntNew['Changed_Date_Of_Change' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Type' . $currChanges] = $rowIntNew['Changed_Type' . $ci];
+				}
+				$addRowArrIndex++;
+			}
+			//array_push($addRowArr , $rowIntNew);
+			
+			$sqlSaveInt = 
+				"Insert Into Chart_Intervensions(
+						Encounter_Number,
+						Reviewer_Name,
+						InterventionAssignment,
+						InterventionAssignmentDesc,
+						InterventionAttributeStatus,
+						Date_Of_Get
+					) Values (
+						:Encounter_Number,
+						:Reviewer_Name,
+						:InterventionAssignment,
+						:InterventionAssignmentDesc,
+						:InterventionAttributeStatus,
+						:Date_Of_Get
+					)";
+
+			$sth = $dbh->prepare($sqlSaveInt);
+			$sth->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+			$sth->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
+			$sth->bindParam(':InterventionAssignment', $rowIntNew['InterventionAssignment'], PDO::PARAM_STR);
+			$sth->bindParam(':InterventionAssignmentDesc',  $rowIntNew['InterventionAssignmentDesc'], PDO::PARAM_STR);
+			$sth->bindParam(':InterventionAttributeStatus',  $rowIntNew['InterventionAttributeStatus'], PDO::PARAM_STR);
+			
+			$sth->bindParam(':Date_Of_Get', $date , PDO::PARAM_INT);
+				
+			header('Content-type: application/json');
+			if (!$sth) {
+				echo "\nPDO::errorInfo():\n";
+				print_r($dbh->errorInfo());
+				$response_array['status'] = 'error';  
+				header('Content-type: application/json');
+				echo json_encode();
+			}
+			
+			$sth->execute();
+		
+		}
+		
+		$intString = rtrim($intString, ",");
+		$sql_GetValue = "SELECT * FROM Chart_Intervensions WHERE Encounter_Number = :EncounterNumber AND InterventionAssignment NOT IN  (" . $intString . ") ORDER BY Date_Of_Get DESC";
+		$sth_GetValue = $dbh->prepare($sql_GetValue);
+		$sth_GetValue->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
+		$sth_GetValue->execute();
+		while ($row_Value = $sth_GetValue->fetch()) {
+			$currField = 'InterventionAssignment';
+			$rowIntNewDeleted = array();
+			
+			$rowIntNewDeleted['EncounterNumber'] = $encounter_Number;
+			$rowIntNewDeleted['InterventionAssignment'] = $row_Value['InterventionAssignment'];
+			$rowIntNewDeleted['InterventionAssignmentDesc'] = $row_Value['InterventionAssignmentDesc'];
+			$rowIntNewDeleted['InterventionAttributeStatus'] = $row_Value['InterventionAttributeStatus'];
+			$intString .= "'" . $rowIntNewDeleted['InterventionAssignment'] . "',"; 
+			
+			$changes = 1;
+			$rowIntNewDeleted['Changes'] = $changes;
+			$rowIntNewDeleted['Changes'] = (string) $changes;
+			$rowIntNewDeleted['Changed_ID' . $changes] = 'Delete';
+			$rowIntNewDeleted['Changed_Field' . $changes] = $currField;
+			$rowIntNewDeleted['Changed_Old_Value' . $changes] = $rowIntNewDeleted[$currField];
+			$rowIntNewDeleted['Changed_New_Value' . $changes] = 'N/A';
+			$rowIntNewDeleted['Changed_Reviewer_Name' . $changes] = "WINRECS";
+			$rowIntNewDeleted['Changed_Date_Of_Change' . $changes] = $date;
+			$rowIntNewDeleted['Changed_Type' . $changes] = 'Delete';
+			
+			$sql_CheckExsists = "SELECT * FROM Chart_Changes WHERE Encounter_Number = :EncounterNumber AND Type = 'Delete' AND InterventionAssignment = :InterventionAssignment";
+			$sth_CheckExsists = $dbh->prepare($sql_CheckExsists);
+			$sth_CheckExsists->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
+			$sth_CheckExsists->bindParam(':InterventionAssignment', $row_Value['InterventionAssignment'], PDO::PARAM_STR);
+			$sth_CheckExsists->execute();
+			if($sth_CheckExsists->fetch(PDO::FETCH_NUM) == 0){
+				$sqlChanged = 
+				"Insert Into Chart_Changes (
+						Encounter_Number,
+						Reviewer_Name,
+						Field,
+						Old_Value,
+						New_Value,
+						Date_Of_Change,
+						Type,
+						InterventionAssignment
+					) Values (
+						:Encounter_Number,
+						:Reviewer_Name,
+						:Field,
+						:Old_Value,
+						:New_Value,
+						:Date_Of_Change,
+						:Type,
+						:InterventionAssignment
+					)";
+
+				$sthChanged = $dbh->prepare($sqlChanged);
+				$sthChanged->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+				$sthChanged->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
+				$sthChanged->bindParam(':Field', $currField, PDO::PARAM_STR);
+				$sthChanged->bindParam(':Old_Value', $row_Value[$currField], PDO::PARAM_STR);
+				$sthChanged->bindParam(':New_Value', $a = 'N/A', PDO::PARAM_STR);
+				$sthChanged->bindParam(':Type', $a = 'Delete', PDO::PARAM_STR);
+				$sthChanged->bindParam(':InterventionAssignment', $row_Value['InterventionAssignment'], PDO::PARAM_STR);
+				
+				$sthChanged->bindParam(':Date_Of_Change', $date , PDO::PARAM_INT);
+					
+				header('Content-type: application/json');
+				if (!$sthChanged) {
+					echo "\nPDO::errorInfo():\n";
+					print_r($dbh->errorInfo());
+					$response_array['status'] = 'error';  
+					header('Content-type: application/json');
+					echo json_encode();
+				}
+
+				$sthChanged->execute();		
+			}				
 			
 			if ($addRowArrIndex>$addRowArrLen){
 				array_push($addRowArr , $rowIntNew);
 			}else{
 				$addRowArr[$addRowArrIndex]['EncounterNumber'] = $encounter_Number;
-				$addRowArr[$addRowArrIndex]['InterventionAssignment'] = $rowInt['IntervCIHIValue'];
-				$addRowArr[$addRowArrIndex]['InterventionAssignmentDesc'] = $rowInt['IntervCodeDesc'];
+				$addRowArr[$addRowArrIndex]['InterventionAssignment'] = $rowIntNewDeleted['InterventionAssignment'];
+				$addRowArr[$addRowArrIndex]['InterventionAssignmentDesc'] = $rowIntNewDeleted['InterventionAssignmentDesc'];
+				
+				$currChanges = isset($addRowArr[$addRowArrIndex]['Changes']) ? $addRowArr[$addRowArrIndex]['Changes'] : 0;
+				for($ci = 0; $ci < $changes; $ci++){
+					$currChanges++;
+					$currField = 'InterventionAssignment';
+					$addRowArr[$addRowArrIndex]['Changes'] = (string) $currChanges;
+					$addRowArr[$addRowArrIndex]['Changed_ID' . $currChanges] = $rowIntNewDeleted['Changed_ID' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Field' . $currChanges] = $rowIntNewDeleted['Changed_Field' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Old_Value' . $currChanges] = $rowIntNewDeleted['Changed_Old_Value' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_New_Value' . $currChanges] = $rowIntNewDeleted['Changed_New_Value' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Reviewer_Name' . $currChanges] = $rowIntNewDeleted['Changed_Reviewer_Name' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Date_Of_Change' . $currChanges] = $rowIntNewDeleted['Changed_Date_Of_Change' . $ci];
+					$addRowArr[$addRowArrIndex]['Changed_Type' . $currChanges] = $rowIntNewDeleted['Changed_Type' . $ci];
+				}
 				$addRowArrIndex++;
 			}
+			
+		}
 		}
 
 		foreach($addRowArr as &$addRow){
