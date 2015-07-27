@@ -19,6 +19,9 @@ $pwd = "78we56";
 //$fieldsToSave = str_getcsv(file_get_contents('fieldsToSave.csv'));
 $fieldList = file("fieldList.csv", FILE_IGNORE_NEW_LINES);
 
+date_default_timezone_set('America/Toronto');
+$date = date('m/d/Y h:i:s a', time());
+
 try {
       $conn = new PDO( "sqlsrv:server=" . $server . ";Database = " . $database, $uid, $pwd); 
       $conn->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION ); 
@@ -57,7 +60,7 @@ try {
    
 		$encounter_Number = $row['EncounterNumber'];
 		
-		$sql_Changes = "SELECT * FROM Chart_Changes WHERE Encounter_Number = :Encounter_Number ORDER BY Date_Of_Change";
+		$sql_Changes = "SELECT * FROM Chart_Changes WHERE Encounter_Number = :Encounter_Number AND Diagnosis_Code = '' ORDER BY Date_Of_Change";
 		$sth_Changes = $dbh->prepare($sql_Changes);
 		$sth_Changes->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
 		$sth_Changes->execute();
@@ -79,7 +82,7 @@ try {
 		}
 		
 		foreach($fieldList as &$field){
-			$sql_GetValue = "SELECT TOP 1 * FROM Chart_Values WHERE EncounterNumber = :EncounterNumber ORDER BY Date_Of_Get DESC";
+			$sql_GetValue = "SELECT TOP 1 * FROM Chart_Values WHERE EncounterNumber = :EncounterNumber AND Diagnosis_Code = '' ORDER BY Date_Of_Get DESC";
 			$sth_GetValue = $dbh->prepare($sql_GetValue);
 			$sth_GetValue->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
 			$sth_GetValue->execute();
@@ -150,6 +153,7 @@ try {
    
 		$stmtDiag->execute();
    
+		$diagString = "";
 		while ( $rowDiag = $stmtDiag->fetch( PDO::FETCH_ASSOC ) ){ 
 			$rowDiagNew = array();
 			
@@ -158,65 +162,36 @@ try {
 			$rowDiagNew['Diagnosis_Description'] = $rowDiag['DiagnosisCodeDesc'];
 			$rowDiagNew['Diagnosis_Type'] = $rowDiag['DiagnosisType'];
 			$rowDiagNew['Diagnosis_Type_Desc'] = $rowDiag['DiagnosisTypeDesc'];
+			$diagString .= "'" . $rowDiagNew['Diagnosis_Code'] . "',"; 
 			
-			array_push($addRowArr , $rowDiagNew);
-		
-			$sqlSaveDiag = 
-					"Insert Into Chart_Diagnosis(
-							Encounter_Number,
-							Reviewer_Name,
-							Diagnosis_Code,
-							Diagnosis_Description,
-							Diagnosis_Type,
-							Diagnosis_Type_Desc,
-							Date_Of_Get
-						) Values (
-							:Encounter_Number,
-							:Reviewer_Name,
-							:Diagnosis_Code,
-							:Diagnosis_Description,
-							:Diagnosis_Type,
-							:Diagnosis_Type_Desc,
-							:Date_Of_Get
-						)";
-
-			$sth = $dbh->prepare($sqlSaveDiag);
-			$sth->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
-			$sth->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
-			$sth->bindParam(':Diagnosis_Code', $rowDiagNew['Diagnosis_Code'], PDO::PARAM_STR);
-			$sth->bindParam(':Diagnosis_Description',  $rowDiagNew['Diagnosis_Description'], PDO::PARAM_STR);
-			$sth->bindParam(':Diagnosis_Type',  $rowDiagNew['Diagnosis_Type'], PDO::PARAM_STR);
-			$sth->bindParam(':Diagnosis_Type_Desc',  $rowDiagNew['Diagnosis_Type_Desc'], PDO::PARAM_STR);
-			
-			date_default_timezone_set('America/Toronto');
-			$date = date('m/d/Y h:i:s a', time());
-			$sth->bindParam(':Date_Of_Get', $date , PDO::PARAM_INT);
-				
-			header('Content-type: application/json');
-			if (!$sth) {
-				echo "\nPDO::errorInfo():\n";
-				print_r($dbh->errorInfo());
-				$response_array['status'] = 'error';  
-				header('Content-type: application/json');
-				echo json_encode();
-			}
-
-			$sth->execute();
-			
-			/*
-			$sql_GetValue = "SELECT TOP 1 * FROM Chart_Diagnosis WHERE Encounter_Number = :EncounterNumber ORDER BY Date_Of_Get DESC";
-			$sth_GetValue = $dbh->prepare($sql_GetValue);
-			$sth_GetValue->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
-			$sth_GetValue->execute();
+			$sql_Changes = "SELECT * FROM Chart_Changes WHERE Encounter_Number = :Encounter_Number AND Diagnosis_Code = :Diagnosis_Code ORDER BY Date_Of_Change";
+			$sth_Changes = $dbh->prepare($sql_Changes);
+			$sth_Changes->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+			$sth_Changes->bindParam(':Diagnosis_Code', $rowDiagNew['Diagnosis_Code'], PDO::PARAM_STR);
+			$sth_Changes->execute();
 			$changes = 0;
 			$rowDiagNew['Changes'] = $changes;
-			$changes = $rowDiagNew['Changes'];
+			while ($row_Changes = $sth_Changes->fetch()) {
+				$changes++;
+				$rowDiagNew['Changes'] = (string) $changes;
+				$rowDiagNew['Changed_ID' . $changes] = $row_Changes['ID'];
+				$rowDiagNew['Changed_Field' . $changes] = $row_Changes['Field'];
+				$rowDiagNew['Changed_Old_Value' . $changes] = $row_Changes['Old_Value'];
+				$rowDiagNew['Changed_New_Value' . $changes] = $row_Changes['New_Value'];
+				$rowDiagNew['Changed_Reviewer_Name' . $changes] = $row_Changes['Reviewer_Name'];
+				$rowDiagNew['Changed_Date_Of_Change' . $changes] = $row_Changes['Date_Of_Change'];
+			}
+			
+			$sql_GetValue = "SELECT TOP 1 * FROM Chart_Diagnosis WHERE Encounter_Number = :EncounterNumber AND Diagnosis_Code = :Diagnosis_Code ORDER BY Date_Of_Get DESC";
+			$sth_GetValue = $dbh->prepare($sql_GetValue);
+			$sth_GetValue->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
+			$sth_GetValue->bindParam(':Diagnosis_Code', $rowDiagNew['Diagnosis_Code'], PDO::PARAM_STR);
+			$sth_GetValue->execute();
+			$diagFound = false;
 			while ($row_Value = $sth_GetValue->fetch()) {
-								$field = 'Diagnosis_Type';
-				$console .= $row_Value[$field] . ' ';
-				$console .= $rowDiagNew[$field] . ' ';
-				if ($row_Value['Diagnosis_Code'] = $rowDiagNew['Diagnosis_Code'] && $row_Value[$field] != $rowDiagNew[$field]){
-					
+				$diagFound = true;
+				$field = 'Diagnosis_Type';
+				if ($row_Value[$field] != $rowDiagNew[$field]){
 					$changes++;
 					$rowDiagNew['Changes'] = (string) $changes;
 					$rowDiagNew['Changed_ID' . $changes] = $row_Value['ID'];
@@ -225,22 +200,27 @@ try {
 					$rowDiagNew['Changed_New_Value' . $changes] = $rowDiagNew[$field];
 					$rowDiagNew['Changed_Reviewer_Name' . $changes] = "WINRECS";
 					$rowDiagNew['Changed_Date_Of_Change' . $changes] = $row_Value['Date_Of_Get'];
+
 					
 					$sqlChanged = 
-					"Insert Into Chart_Changes(
+					"Insert Into Chart_Changes (
 							Encounter_Number,
 							Reviewer_Name,
 							Field,
 							Old_Value,
 							New_Value,
-							Date_Of_Change
+							Date_Of_Change,
+							Type,
+							Diagnosis_Code
 						) Values (
 							:Encounter_Number,
 							:Reviewer_Name,
 							:Field,
 							:Old_Value,
 							:New_Value,
-							:Date_Of_Change
+							:Date_Of_Change,
+							:Type,
+							:Diagnosis_Code
 						)";
 
 					$sthChanged = $dbh->prepare($sqlChanged);
@@ -249,6 +229,8 @@ try {
 					$sthChanged->bindParam(':Field', $field, PDO::PARAM_STR);
 					$sthChanged->bindParam(':Old_Value', $row_Value[$field], PDO::PARAM_STR);
 					$sthChanged->bindParam(':New_Value', $rowDiagNew[$field], PDO::PARAM_STR);
+					$sthChanged->bindParam(':Type', $a = 'Change', PDO::PARAM_STR);
+					$sthChanged->bindParam(':Diagnosis_Code', $rowDiagNew['Diagnosis_Code'], PDO::PARAM_STR);
 					
 					$sthChanged->bindParam(':Date_Of_Change', $row_Value['Date_Of_Get'] , PDO::PARAM_INT);
 						
@@ -264,8 +246,176 @@ try {
 					$sthChanged->execute();
 				}
 			}
-		*/
+			if ($diagFound == false){
+				$field = 'Diagnosis_Code';
+				$changes++;
+				$rowDiagNew['Changes'] = (string) $changes;
+				$rowDiagNew['Changed_ID' . $changes] = 'Add';
+				$rowDiagNew['Changed_Field' . $changes] = $field;
+				$rowDiagNew['Changed_Old_Value' . $changes] = 'N/A';
+				$rowDiagNew['Changed_New_Value' . $changes] = $rowDiagNew[$field];
+				$rowDiagNew['Changed_Reviewer_Name' . $changes] = "WINRECS";
+				$rowDiagNew['Changed_Date_Of_Change' . $changes] = $date;
+				
+				$sqlChanged = 
+				"Insert Into Chart_Changes (
+						Encounter_Number,
+						Reviewer_Name,
+						Field,
+						Old_Value,
+						New_Value,
+						Date_Of_Change,
+						Type,
+						Diagnosis_Code
+					) Values (
+						:Encounter_Number,
+						:Reviewer_Name,
+						:Field,
+						:Old_Value,
+						:New_Value,
+						:Date_Of_Change,
+						:Type,
+						:Diagnosis_Code
+					)";
+
+				$sthChanged = $dbh->prepare($sqlChanged);
+				$sthChanged->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+				$sthChanged->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
+				$sthChanged->bindParam(':Field', $field, PDO::PARAM_STR);
+				$sthChanged->bindParam(':Old_Value', $a = 'N/A', PDO::PARAM_STR);
+				$sthChanged->bindParam(':New_Value', $rowDiagNew[$field], PDO::PARAM_STR);
+				$sthChanged->bindParam(':Type', $a = 'Add', PDO::PARAM_STR);
+				$sthChanged->bindParam(':Diagnosis_Code', $rowDiagNew['Diagnosis_Code'], PDO::PARAM_STR);
+				
+				$sthChanged->bindParam(':Date_Of_Change', $date , PDO::PARAM_INT);
+					
+				header('Content-type: application/json');
+				if (!$sthChanged) {
+					echo "\nPDO::errorInfo():\n";
+					print_r($dbh->errorInfo());
+					$response_array['status'] = 'error';  
+					header('Content-type: application/json');
+					echo json_encode();
+				}
+
+				$sthChanged->execute();
+			}
+			array_push($addRowArr , $rowDiagNew);
+			
+			$sqlSaveDiag = 
+				"Insert Into Chart_Diagnosis(
+						Encounter_Number,
+						Reviewer_Name,
+						Diagnosis_Code,
+						Diagnosis_Description,
+						Diagnosis_Type,
+						Diagnosis_Type_Desc,
+						Date_Of_Get
+					) Values (
+						:Encounter_Number,
+						:Reviewer_Name,
+						:Diagnosis_Code,
+						:Diagnosis_Description,
+						:Diagnosis_Type,
+						:Diagnosis_Type_Desc,
+						:Date_Of_Get
+					)";
+
+			$sth = $dbh->prepare($sqlSaveDiag);
+			$sth->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+			$sth->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
+			$sth->bindParam(':Diagnosis_Code', $rowDiagNew['Diagnosis_Code'], PDO::PARAM_STR);
+			$sth->bindParam(':Diagnosis_Description',  $rowDiagNew['Diagnosis_Description'], PDO::PARAM_STR);
+			$sth->bindParam(':Diagnosis_Type',  $rowDiagNew['Diagnosis_Type'], PDO::PARAM_STR);
+			$sth->bindParam(':Diagnosis_Type_Desc',  $rowDiagNew['Diagnosis_Type_Desc'], PDO::PARAM_STR);
+			
+			$sth->bindParam(':Date_Of_Get', $date , PDO::PARAM_INT);
+				
+			header('Content-type: application/json');
+			if (!$sth) {
+				echo "\nPDO::errorInfo():\n";
+				print_r($dbh->errorInfo());
+				$response_array['status'] = 'error';  
+				header('Content-type: application/json');
+				echo json_encode();
+			}
+			
+			$sth->execute();
 		
+		}
+		
+		$diagString = rtrim($diagString, ",");
+		$console .= $diagString . '; ';
+		$sql_GetValue = "SELECT TOP 1 * FROM Chart_Diagnosis WHERE Encounter_Number = :EncounterNumber AND Diagnosis_Code NOT IN  (" . $diagString . ") ORDER BY Date_Of_Get DESC";
+		$sth_GetValue = $dbh->prepare($sql_GetValue);
+		$sth_GetValue->bindParam(':EncounterNumber', $encounter_Number, PDO::PARAM_STR);
+		$sth_GetValue->execute();
+		while ($row_Value = $sth_GetValue->fetch()) {
+			$field = 'Diagnosis_Code';
+			$rowDiagNewDeleted = array();
+			
+			$rowDiagNewDeleted['EncounterNumber'] = $encounter_Number;
+			$rowDiagNewDeleted['Diagnosis_Code'] = $row_Value['Diagnosis_Code'];
+			$rowDiagNewDeleted['Diagnosis_Description'] = $row_Value['Diagnosis_Description'];
+			$rowDiagNewDeleted['Diagnosis_Type'] = $row_Value['Diagnosis_Type'];
+			$rowDiagNewDeleted['Diagnosis_Type_Desc'] = $row_Value['Diagnosis_Type_Desc'];
+			$diagString .= "'" . $rowDiagNewDeleted['Diagnosis_Code'] . "',"; 
+			
+			$changes = 1;
+			$rowDiagNewDeleted['Changes'] = $changes;
+			$rowDiagNewDeleted['Changes'] = (string) $changes;
+			$rowDiagNewDeleted['Changed_ID' . $changes] = $row_Value['ID'];
+			$rowDiagNewDeleted['Changed_Field' . $changes] = $field;
+			$rowDiagNewDeleted['Changed_Old_Value' . $changes] = $rowDiagNewDeleted[$field];
+			$rowDiagNewDeleted['Changed_New_Value' . $changes] = 'N/A';
+			$rowDiagNewDeleted['Changed_Reviewer_Name' . $changes] = "WINRECS";
+			$rowDiagNewDeleted['Changed_Date_Of_Change' . $changes] = $date;
+			
+			$sqlChanged = 
+			"Insert Into Chart_Changes (
+					Encounter_Number,
+					Reviewer_Name,
+					Field,
+					Old_Value,
+					New_Value,
+					Date_Of_Change,
+					Type,
+					Diagnosis_Code
+				) Values (
+					:Encounter_Number,
+					:Reviewer_Name,
+					:Field,
+					:Old_Value,
+					:New_Value,
+					:Date_Of_Change,
+					:Type,
+					:Diagnosis_Code
+				)";
+
+			$sthChanged = $dbh->prepare($sqlChanged);
+			$sthChanged->bindParam(':Encounter_Number', $encounter_Number, PDO::PARAM_STR);
+			$sthChanged->bindParam(':Reviewer_Name',$a = 'WINRECS', PDO::PARAM_STR);
+			$sthChanged->bindParam(':Field', $field, PDO::PARAM_STR);
+			$sthChanged->bindParam(':Old_Value', $row_Value[$field], PDO::PARAM_STR);
+			$sthChanged->bindParam(':New_Value', $a = 'N/A', PDO::PARAM_STR);
+			$sthChanged->bindParam(':Type', $a = 'Delete', PDO::PARAM_STR);
+			$sthChanged->bindParam(':Diagnosis_Code', $row_Value['Diagnosis_Code'], PDO::PARAM_STR);
+			
+			$sthChanged->bindParam(':Date_Of_Change', $date , PDO::PARAM_INT);
+				
+			header('Content-type: application/json');
+			if (!$sthChanged) {
+				echo "\nPDO::errorInfo():\n";
+				print_r($dbh->errorInfo());
+				$response_array['status'] = 'error';  
+				header('Content-type: application/json');
+				echo json_encode();
+			}
+
+			$sthChanged->execute();
+			
+			array_push($addRowArr , $rowDiagNewDeleted);
+			
 		}
 		
 		$queryInt = "select *,
@@ -322,8 +472,6 @@ try {
 		foreach($fieldList as &$fieldQry){
 			$sth->bindParam(':' . $fieldQry,  $row[$fieldQry], PDO::PARAM_STR);
 		}
-		date_default_timezone_set('America/Toronto');
-		$date = date('m/d/Y h:i:s a', time());
 		$sth->bindParam(':Date_Of_Get', $date , PDO::PARAM_INT);
 			
 		header('Content-type: application/json');
